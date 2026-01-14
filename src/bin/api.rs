@@ -251,9 +251,29 @@ async fn get_anomalies(
     for bus_id in candidate_buses {
         if let Some(records) = history_lock.get(bus_id) {
             let mut score: u64 = 0;
+            // Map of Day -> List of intervals > 3600s
+            let mut daily_long_intervals: HashMap<u64, Vec<u64>> = HashMap::new();
+
             for record in records {
                 if record.rank >= min_rank {
-                    score += record.interval as u64;
+                    let interval = record.interval as u64;
+                    if interval > 3600 {
+                        // Group by day (UTC)
+                        let day = record.end_of_interval / 86400;
+                        daily_long_intervals.entry(day).or_default().push(interval);
+                    } else {
+                        score += interval;
+                    }
+                }
+            }
+
+            // Add back the long intervals, allowing up to 3 per day to be "free" (sleep)
+            for list in daily_long_intervals.values_mut() {
+                // Sort descending
+                list.sort_unstable_by(|a, b| b.cmp(a));
+                // Skip the largest 3 (sleep allowance)
+                for interval in list.iter().skip(3) {
+                    score += interval;
                 }
             }
             if score > 0 {
@@ -269,8 +289,8 @@ async fn get_anomalies(
     // 3. Sort by score descending
     scored_buses.sort_by(|a, b| b.score.cmp(&a.score));
 
-    // Limit to top 50
-    scored_buses.truncate(50);
+    // Limit to top 100
+    scored_buses.truncate(100);
 
     Json(scored_buses)
 }
