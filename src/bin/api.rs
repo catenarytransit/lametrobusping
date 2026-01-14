@@ -82,6 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/history/:bus_id", get(get_history))
         .route("/stats", get(get_stats))
         .route("/anomalies", get(get_anomalies))
+        .layer(tower_http::cors::CorsLayer::permissive())
         .with_state(state);
 
     let addr = format!("0.0.0.0:{}", args.port);
