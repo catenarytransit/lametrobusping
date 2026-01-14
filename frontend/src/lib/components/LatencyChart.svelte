@@ -110,6 +110,18 @@
         }
 
         const rawDatasets = $state.snapshot(datasets);
+
+        // Preserve hidden status from current datasets
+        const hiddenStatus = new Map<string, boolean>();
+        if (chart.data && chart.data.datasets) {
+             chart.data.datasets.forEach((ds, index) => {
+                if (ds.label) {
+                    const isVisible = chart.isDatasetVisible(index);
+                    hiddenStatus.set(ds.label, !isVisible);
+                }
+            });
+        }
+
         chart.data.datasets = rawDatasets.map(ds => ({
             label: ds.label,
             data: ds.data,
@@ -118,7 +130,8 @@
             borderWidth: 1.5,
             tension: 0.1,
             pointRadius: 0,
-            fill: ds.fill
+            fill: ds.fill,
+            hidden: hiddenStatus.has(ds.label) ? hiddenStatus.get(ds.label) : undefined
         }));
 
         // Update plugin options
