@@ -3,6 +3,7 @@ use axum::{
     extract::{Path, Query, State},
     routing::get,
 };
+use clap::Parser;
 use lametrobusping::{ChunkFile, Record, SystemStats, ensure_data_dir};
 use std::{
     collections::{HashMap, VecDeque},
@@ -25,6 +26,14 @@ struct AppState {
     anomalies: Arc<RwLock<HashMap<u8, VecDeque<(u64, String)>>>>,
 }
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Port to listen on
+    #[arg(short, long, default_value_t = 3000)]
+    port: u16,
+}
+
 #[derive(serde::Deserialize)]
 struct AnomaliesQuery {
     min_rank: Option<u8>,
@@ -40,6 +49,7 @@ struct ScoredBus {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
     ensure_data_dir()?;
     println!("Starting API...");
 
@@ -74,8 +84,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/anomalies", get(get_anomalies))
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
-    println!("Listening on 0.0.0.0:3000");
+    let addr = format!("0.0.0.0:{}", args.port);
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    println!("Listening on {}", addr);
     axum::serve(listener, app).await?;
 
     Ok(())
