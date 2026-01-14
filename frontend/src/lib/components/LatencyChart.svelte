@@ -5,7 +5,7 @@
 
     interface Dataset {
         label: string;
-        data: { x: number; y: number }[];
+        data: { x: number; y: number; has_trip?: boolean }[];
         color: string;
         borderColor?: string;
         backgroundColor?: string;
@@ -129,9 +129,14 @@
             backgroundColor: ds.backgroundColor, // for fill
             borderWidth: 1.5,
             tension: 0.1,
-            pointRadius: 0,
+            pointRadius: (ctx: any) => !ctx.raw?.has_trip ? 3 : 0, // Show points if no trip
+            pointBackgroundColor: 'gray',
             fill: ds.fill,
-            hidden: hiddenStatus.has(ds.label) ? hiddenStatus.get(ds.label) : undefined
+            hidden: hiddenStatus.has(ds.label) ? hiddenStatus.get(ds.label) : undefined,
+            segment: {
+                borderColor: (ctx: any) => !ctx.p0.raw?.has_trip ? 'gray' : undefined,
+                borderDash: (ctx: any) => !ctx.p0.raw?.has_trip ? [5, 5] : undefined,
+            }
         }));
 
         // Update plugin options

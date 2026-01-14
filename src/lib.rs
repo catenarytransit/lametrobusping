@@ -9,6 +9,8 @@ pub struct Record {
     pub end_of_interval: u64, // Unix timestamp
     pub latency: u16,         // Seconds
     pub rank: u8,             // Percentile rank (0-100)
+    #[serde(default)]
+    pub has_trip: bool, // Whether the bus has a trip_id
 }
 
 /// System-wide statistics for a specific minute.

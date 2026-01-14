@@ -29,6 +29,12 @@ struct Entity {
 #[derive(Deserialize, Debug)]
 struct VehiclePosition {
     timestamp: u64,
+    trip: Option<TripDescriptor>,
+}
+
+#[derive(Deserialize, Debug)]
+struct TripDescriptor {
+    trip_id: Option<String>,
 }
 
 #[tokio::main]
@@ -59,6 +65,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Some(vehicle) = entity.vehicle {
                         let bus_id = entity.id;
                         let vehicle_ts = vehicle.timestamp;
+                        let has_trip = vehicle
+                            .trip
+                            .as_ref()
+                            .and_then(|t| t.trip_id.as_ref())
+                            .is_some();
 
                         // Only process if we have seen this bus before
                         if let Some(&prev_ts) = last_updates.get(&bus_id) {
@@ -79,15 +90,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     end_of_interval: vehicle_ts,
                                     latency,
                                     rank: 0, // Placeholder, updated before flush
+                                    has_trip,
                                 };
                                 current_chunk
                                     .entry(bus_id.clone())
                                     .or_default()
                                     .push(record);
 
-                                // Add to stats samples
-                                interval_samples.push(interval);
-                                latency_samples.push(latency);
+                                // Add to stats samples if has_trip
+                                if has_trip {
+                                    interval_samples.push(interval);
+                                    latency_samples.push(latency);
+                                }
                             }
                         }
 

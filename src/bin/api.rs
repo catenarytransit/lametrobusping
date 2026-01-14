@@ -255,7 +255,7 @@ async fn get_anomalies(
             let mut daily_long_intervals: HashMap<u64, Vec<u64>> = HashMap::new();
 
             for record in records {
-                if record.rank >= min_rank {
+                if record.rank >= min_rank && record.has_trip {
                     let interval = record.interval as u64;
                     if interval > 3600 {
                         // Group by day (UTC)
