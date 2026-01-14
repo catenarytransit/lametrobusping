@@ -94,6 +94,15 @@
 
 </script>
 
+<svelte:head>
+    <title>LA Metro Bus Ping</title>
+    <meta property="og:title" content="LA Metro Bus Ping" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lametrobusping.catenarymaps.org/thumbnailbusping.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://lametrobusping.catenarymaps.org/thumbnailbusping.png" />
+</svelte:head>
+
 <div class="bg-gray-50 min-h-screen font-sans">
     <!-- Sticky Header -->
     <header class="sticky top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm px-8 py-4 flex items-center justify-between">
