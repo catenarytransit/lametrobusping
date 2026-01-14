@@ -157,6 +157,7 @@
                         <div class="h-40 w-full min-w-0"> <!-- min-w-0 is key for grid child scaling -->
                             <LatencyChart 
                                 datasets={[
+                                    { 
                                         label: 'Latency', 
                                         data: bus.history.map(r => ({ x: r.end_of_interval, y: r.latency, has_trip: r.has_trip })), 
                                         color: '#ef4444' 
