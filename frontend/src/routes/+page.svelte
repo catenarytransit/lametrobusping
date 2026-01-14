@@ -95,6 +95,7 @@
 </script>
 
 <svelte:head>
+    <link rel="icon" href="https://lametrobusping.catenarymaps.org/logo.svg">
     <title>LA Metro Bus Ping</title>
     <meta property="og:title" content="LA Metro Bus Ping" />
     <meta property="og:type" content="website" />
