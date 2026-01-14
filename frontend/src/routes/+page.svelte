@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import LatencyChart from '$lib/components/LatencyChart.svelte';
+    import MainCharts from '$lib/components/MainCharts.svelte';
 
     type Record = {
         interval: number;
@@ -35,8 +36,12 @@
     async function fetchData() {
         try {
             const [statsRes, anomaliesRes] = await Promise.all([
-                fetch('/stats'),
-                fetch('/anomalies?min_rank=90')
+                fetch('https://lametrobuspingapi.catenarymaps.org/stats', {
+                    mode: 'cors'
+                }),
+                fetch('https://lametrobuspingapi.catenarymaps.org/anomalies?min_rank=90', {
+                    mode: 'cors'
+                })
             ]);
 
             if (statsRes.ok) stats = await statsRes.json();
@@ -52,80 +57,118 @@
         return () => clearInterval(interval);
     });
 
-    // Helper to extract points
-    function toPoints(data: SystemStats[], selector: (s: SystemStats) => number) {
-        return data.map(s => ({ x: s.timestamp, y: selector(s) }));
+
+
+    let minTime: number | null = $state(null);
+    let maxTime: number | null = $state(null);
+    let hoveredTime: number | null = $state(null);
+
+    function handleZoom(min: number, max: number) {
+        minTime = min;
+        maxTime = max;
     }
 
-    // Master Charts Data
-    let latencyDatasets = $derived([
-        { label: 'P99', data: toPoints(stats, s => s.latency_stats.p99), color: '#ef4444' }, // Red
-        { label: 'P90', data: toPoints(stats, s => s.latency_stats.p90), color: '#f59e0b' }, // Orange
-        { label: 'P50', data: toPoints(stats, s => s.latency_stats.p50), color: '#10b981' }, // Green
-    ]);
+    function resetZoom() {
+        minTime = null;
+        maxTime = null;
+    }
 
-    let intervalDatasets = $derived([
-        { label: 'P99', data: toPoints(stats, s => s.interval_stats.p99), color: '#8b5cf6' }, // Purple
-        { label: 'P90', data: toPoints(stats, s => s.interval_stats.p90), color: '#6366f1' }, // Indigo
-        { label: 'P50', data: toPoints(stats, s => s.interval_stats.p50), color: '#3b82f6' }, // Blue
-    ]);
+    function handleHover(time: number | null) {
+        hoveredTime = time;
+    }
+
+    $effect(() => {
+        const snapParams = $state.snapshot(stats);
+        if (snapParams.length > 0) {
+            const first = snapParams[0];
+            console.log('Stats[0] keys:', Object.keys(first));
+            if (first.latency_stats) {
+                console.log('Stats[0].latency_stats keys:', Object.keys(first.latency_stats));
+                console.log('Stats[0].latency_stats values:', first.latency_stats);
+            }
+            if (first.interval_stats) {
+                console.log('Stats[0].interval_stats keys:', Object.keys(first.interval_stats));
+            }
+        }
+    });
 
 </script>
 
-<div class="p-8 bg-gray-50 min-h-screen font-sans">
-    <h1 class="text-3xl font-bold mb-8">Bus Latency Dashboard</h1>
-
-    {#if error}
-        <div class="bg-red-100 p-4 mb-4 rounded text-red-700">{error}</div>
-    {/if}
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-        <!-- Master Chart: Latency -->
-        <div class="bg-white p-6 rounded shadow">
-            <h2 class="text-xl font-semibold mb-2">System Data Latency (Age)</h2>
-            <div class="text-sm text-gray-500 mb-4">Seconds behind real-time</div>
-            <LatencyChart datasets={latencyDatasets} height="h-64" showLegend={true} />
+<div class="bg-gray-50 min-h-screen font-sans">
+    <!-- Sticky Header -->
+    <header class="sticky top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm px-8 py-4 flex items-center justify-between">
+        <div class="flex flex-row items-center space-x-2">
+            <img src="https://catenarymaps.org/logomark.svg" alt="Catenary Maps" class="h-6">
+            <div class="">|</div>
+            <img src="/Lametro.svg" class="h-7"/>
+            <h1 class="text-xl font-bold">
+                Bus Ping
+            </h1>
         </div>
-
-        <!-- Master Chart: Interval -->
-        <div class="bg-white p-6 rounded shadow">
-            <h2 class="text-xl font-semibold mb-2">System Update Interval (Ping)</h2>
-            <div class="text-sm text-gray-500 mb-4">Seconds between updates</div>
-            <LatencyChart datasets={intervalDatasets} height="h-64" showLegend={true} />
+        
+        <div class="flex items-center space-x-4">
+            <button 
+                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onclick={resetZoom}
+                disabled={minTime === null}
+            >
+                Reset Zoom
+            </button>
+            <span class="text-sm text-gray-400">v0.1.0</span>
         </div>
-    </div>
+    </header>
 
-    <div>
-        <h2 class="text-xl font-semibold mb-4">Top Anomalous Buses (>P90)</h2>
-        <div class="space-y-4">
-            {#each anomalies as bus (bus.bus_id)}
-                <div class="bg-white p-4 rounded shadow grid grid-cols-1 md:grid-cols-[150px_1fr] gap-4 items-center">
-                    <div>
-                        <div class="text-lg font-bold text-gray-900">{bus.bus_id}</div>
-                        <div class="text-sm text-gray-500">Score: <span class="font-mono">{bus.score}</span></div>
-                        <div class="text-xs text-gray-400 mt-1">{bus.history.length} data points</div>
+    <main class="p-8">
+        {#if error}
+            <div class="bg-red-100 p-4 mb-4 rounded text-red-700">{error}</div>
+        {/if}
+
+        <MainCharts 
+            stats={stats}
+            minTime={minTime}
+            maxTime={maxTime}
+            hoveredTime={hoveredTime}
+            onZoom={handleZoom}
+            onHover={handleHover}
+        />
+
+        <div>
+            <h2 class="text-xl font-semibold mb-4">Top Anomalous Buses (>P80)</h2>
+            <div class="space-y-4">
+                {#each anomalies as bus (bus.bus_id)}
+                    <div class="bg-white p-4 rounded shadow grid grid-cols-1 md:grid-cols-[150px_1fr] gap-4 items-center overflow-hidden">
+                        <div>
+                            <div class="text-lg font-bold text-gray-900">{bus.bus_id}</div>
+                            <div class="text-sm text-gray-500">Score: <span class="font-mono">{bus.score}</span></div>
+                            <div class="text-xs text-gray-400 mt-1">{bus.history.length} data points</div>
+                        </div>
+                        
+                        <div class="h-40 w-full min-w-0"> <!-- min-w-0 is key for grid child scaling -->
+                            <LatencyChart 
+                                datasets={[
+                                    { 
+                                        label: 'Latency', 
+                                        data: bus.history.map(r => ({ x: r.end_of_interval, y: r.latency })), 
+                                        color: '#ef4444' 
+                                    },
+                                    { 
+                                        label: 'Interval', 
+                                        data: bus.history.map(r => ({ x: r.end_of_interval, y: r.interval })), 
+                                        color: '#3b82f6' 
+                                    }
+                                ]}
+                                height="h-full"
+                                showLegend={true}
+                                min={minTime} 
+                                max={maxTime} 
+                                onZoom={handleZoom}
+                                hoveredTime={hoveredTime}
+                                onHover={handleHover}
+                            />
+                        </div>
                     </div>
-                    
-                    <div class="h-40 w-full">
-                        <LatencyChart 
-                            datasets={[
-                                { 
-                                    label: 'Latency', 
-                                    data: bus.history.map(r => ({ x: r.end_of_interval, y: r.latency })), 
-                                    color: '#ef4444' 
-                                },
-                                { 
-                                    label: 'Interval', 
-                                    data: bus.history.map(r => ({ x: r.end_of_interval, y: r.interval })), 
-                                    color: '#3b82f6' 
-                                }
-                            ]}
-                            height="h-full"
-                            showLegend={true}
-                        />
-                    </div>
-                </div>
-            {/each}
+                {/each}
+            </div>
         </div>
-    </div>
+    </main>
 </div>

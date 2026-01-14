@@ -6,11 +6,6 @@ import { sveltekit } from '@sveltejs/kit/vite';
 export default defineConfig({
 	plugins: [sveltekit(), tailwindcss()],
 	server: {
-		proxy: {
-			'/history': 'http://localhost:3000',
-			'/stats': 'http://localhost:3000',
-			'/anomalies': 'http://localhost:3000',
-		}
 	},
 
 	test: {
