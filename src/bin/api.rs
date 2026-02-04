@@ -12,7 +12,7 @@ use std::{
 };
 use tokio::time;
 
-const RETENTION_SECONDS: u64 = 48 * 3600;
+const RETENTION_SECONDS: u64 = 36 * 3600;
 
 #[derive(Clone)]
 struct AppState {
@@ -38,6 +38,12 @@ struct Args {
 struct AnomaliesQuery {
     min_rank: Option<u8>,
     // Optional: filter by time range if needed, e.g., since: Option<u64>
+}
+
+#[derive(serde::Deserialize)]
+struct StatsQuery {
+    since: Option<u64>,
+    step: Option<usize>,
 }
 
 #[derive(serde::Serialize)]
@@ -222,9 +228,35 @@ async fn get_history(
     }
 }
 
-async fn get_stats(State(state): State<AppState>) -> Json<Vec<SystemStats>> {
+async fn get_stats(
+    State(state): State<AppState>,
+    Query(query): Query<StatsQuery>,
+) -> Json<Vec<SystemStats>> {
     let stats = state.stats.read().unwrap();
-    Json(stats.iter().cloned().collect())
+    
+    // Filter by since
+    let filtered = if let Some(since) = query.since {
+        stats
+            .iter()
+            .filter(|s| s.timestamp >= since)
+            .collect::<Vec<_>>()
+    } else {
+        stats.iter().collect::<Vec<_>>()
+    };
+
+    // Decimate
+    let step = query.step.unwrap_or(1);
+    if step <= 1 {
+        Json(filtered.into_iter().cloned().collect())
+    } else {
+        Json(
+            filtered
+                .into_iter()
+                .step_by(step)
+                .cloned()
+                .collect()
+        )
+    }
 }
 
 async fn get_anomalies(

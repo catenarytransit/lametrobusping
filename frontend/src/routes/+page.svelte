@@ -34,10 +34,33 @@
     let anomalies: ScoredBus[] = $state([]);
     let error: string | null = $state(null);
 
+    // Time Range Selector
+    let selectedTimeRange: number | null = $state(30 * 60); // Default 30m
+
     async function fetchData() {
         try {
+            // Determine params
+            let params = new URLSearchParams();
+            if (selectedTimeRange !== null) {
+                const since = Math.floor(Date.now() / 1000 - selectedTimeRange);
+                params.set('since', String(since));
+                
+                let step = 1;
+                if (selectedTimeRange > 4 * 3600) {
+                    step = 30; // >4h -> 5m
+                } else if (selectedTimeRange === 4 * 3600) {
+                    step = 6;  // 4h -> 1m
+                } else if (selectedTimeRange === 3600) {
+                    step = 2;  // 1h -> 20s
+                }
+                params.set('step', String(step));
+            } else {
+                // Max
+                params.set('step', '30');
+            }
+
             const [statsRes, anomaliesRes] = await Promise.all([
-                fetch('https://lametrobuspingapi.catenarymaps.org/stats', {
+                fetch(`https://lametrobuspingapi.catenarymaps.org/stats?${params.toString()}`, {
                     mode: 'cors'
                 }),
                 fetch('https://lametrobuspingapi.catenarymaps.org/anomalies?min_rank=90', {
@@ -52,8 +75,30 @@
         }
     }
 
-    onMount(() => {
+    $effect(() => {
+        // Refetch when time range changes
+        // Using $derived or explicit reaction
+        // Simple way: rely on selectedTimeRange being tracked.
+        // But fetchData is async and not reactive by default unless called in effect.
+        // We can just call fetchData whenever selectedTimeRange changes.
+    });
+    
+    // Watch selectedTimeRange
+    $effect(() => {
+        // This will run when selectedTimeRange changes
+        // But we need to make sure we don't double fetch on mount if mount calls it too.
+        // On mount, we set interval.
+        // Let's just call fetchData().
+        // Note: We need to use the value of selectedTimeRange inside.
+        // By reading it here, we subscribe to it.
+        const _ = selectedTimeRange;
         fetchData();
+    });
+
+    onMount(() => {
+        // fetchData is called by the effect on mount?
+        // standard pattern:
+        // fetchData(); // Effect handles initial call
         const interval = setInterval(fetchData, 10000);
         return () => clearInterval(interval);
     });
@@ -118,6 +163,24 @@
         </div>
         
         <div class="flex items-center space-x-4">
+             <div class="flex bg-gray-100 rounded p-1 space-x-1">
+                {#each [
+                    { label: '30m', val: 30 * 60 }, 
+                    { label: '1h', val: 60 * 60 }, 
+                    { label: '4h', val: 4 * 60 * 60 },
+                    { label: '12h', val: 12 * 60 * 60 },
+                    { label: '24h', val: 24 * 60 * 60 },
+                    { label: 'Max', val: null }
+                ] as range}
+                    <button 
+                        class="px-2 py-1 rounded text-xs font-medium transition-colors {selectedTimeRange === range.val ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}"
+                        onclick={() => selectedTimeRange = range.val}
+                    >
+                        {range.label}
+                    </button>
+                {/each}
+            </div>
+
             <button 
                 class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 onclick={resetZoom}
