@@ -37,7 +37,8 @@ struct Args {
 #[derive(serde::Deserialize)]
 struct AnomaliesQuery {
     min_rank: Option<u8>,
-    // Optional: filter by time range if needed, e.g., since: Option<u64>
+    since: Option<u64>,
+    step: Option<usize>,
 }
 
 #[derive(serde::Deserialize)]
@@ -216,13 +217,33 @@ fn prune_memory(state: AppState) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[derive(serde::Deserialize)]
+struct HistoryQuery {
+    since: Option<u64>,
+    step: Option<usize>,
+}
+
 async fn get_history(
     State(state): State<AppState>,
     Path(bus_id): Path<String>,
+    Query(query): Query<HistoryQuery>,
 ) -> Json<Vec<Record>> {
     let history = state.history.read().unwrap();
     if let Some(records) = history.get(&bus_id) {
-        Json(records.iter().cloned().collect())
+        let since = query.since.unwrap_or(0);
+        let step = query.step.unwrap_or(1);
+
+        let filtered = records
+            .iter()
+            .filter(|r| r.end_of_interval >= since)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if step <= 1 {
+            Json(filtered)
+        } else {
+            Json(filtered.into_iter().step_by(step).collect())
+        }
     } else {
         Json(Vec::new())
     }
@@ -264,6 +285,9 @@ async fn get_anomalies(
     Query(query): Query<AnomaliesQuery>,
 ) -> Json<Vec<ScoredBus>> {
     let min_rank = query.min_rank.unwrap_or(90);
+    let since = query.since.unwrap_or(0);
+    let step = query.step.unwrap_or(1);
+
     let anomalies = state.anomalies.read().unwrap();
     let history_lock = state.history.read().unwrap();
 
@@ -272,8 +296,10 @@ async fn get_anomalies(
     // 1. Gather candidates
     for rank in min_rank..=100 {
         if let Some(list) = anomalies.get(&rank) {
-            for (_, bus_id) in list {
-                candidate_buses.insert(bus_id);
+            for (ts, bus_id) in list {
+                if *ts >= since {
+                     candidate_buses.insert(bus_id);
+                }
             }
         }
     }
@@ -286,7 +312,16 @@ async fn get_anomalies(
             // Map of Day -> List of intervals > 3600s
             let mut daily_long_intervals: HashMap<u64, Vec<u64>> = HashMap::new();
 
-            for record in records {
+            // Filter relevant records for scoring AND display
+            let relevant_records: Vec<_> = records.iter()
+                .filter(|r| r.end_of_interval >= since)
+                .cloned()
+                .collect();
+
+            // Only score based on the visible range? 
+            // The prompt says "same data range... for the vehicles themselves".
+            // So we should score based on what is displayed.
+            for record in &relevant_records {
                 if record.rank >= min_rank && record.has_trip {
                     let interval = record.interval as u64;
                     if interval > 3600 {
@@ -299,20 +334,24 @@ async fn get_anomalies(
                 }
             }
 
-            // Add back the long intervals, allowing up to 3 per day to be "free" (sleep)
+            // Add back the long intervals...
             for list in daily_long_intervals.values_mut() {
-                // Sort descending
                 list.sort_unstable_by(|a, b| b.cmp(a));
-                // Skip the largest 3 (sleep allowance)
                 for interval in list.iter().skip(3) {
                     score += interval;
                 }
             }
             if score > 0 {
+                let display_history = if step <= 1 {
+                    relevant_records
+                } else {
+                    relevant_records.into_iter().step_by(step).collect()
+                };
+
                 scored_buses.push(ScoredBus {
                     bus_id: bus_id.clone(),
                     score,
-                    history: records.iter().cloned().collect(),
+                    history: display_history,
                 });
             }
         }

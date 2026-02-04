@@ -63,7 +63,7 @@
                 fetch(`https://lametrobuspingapi.catenarymaps.org/stats?${params.toString()}`, {
                     mode: 'cors'
                 }),
-                fetch('https://lametrobuspingapi.catenarymaps.org/anomalies?min_rank=90', {
+                fetch(`https://lametrobuspingapi.catenarymaps.org/anomalies?min_rank=90&${params.toString()}`, {
                     mode: 'cors'
                 })
             ]);
