@@ -86,21 +86,29 @@
         });
 
         if (hasData) {
-            // Align to hourly boundaries
-            // 3600 seconds = 1 hour
-            const stepSize = 3600;
-            const alignedMin = Math.floor(minX / stepSize) * stepSize;
-            const alignedMax = Math.ceil(maxX / stepSize) * stepSize;
+            let viewMin, viewMax;
+
+            // Determine effective view range
+            if (min !== null && max !== null) {
+                viewMin = min;
+                viewMax = max;
+            } else {
+                // Use exact data range, NO padding/alignment
+                viewMin = minX;
+                viewMax = maxX;
+            }
+
+            // Now calculate appropriate step size for the VIEW range
+            const viewDuration = viewMax - viewMin;
+            let stepSize = 3600;
+            // 4 hours = 14400 seconds
+            if (viewDuration <= 14400) {
+                 stepSize = 600; // 10 minutes
+            }
 
             if (chart.options.scales?.x) {
-                // If external min/max are provided, use them. Otherwise use aligned auto range.
-                if (min !== null && max !== null) {
-                    chart.options.scales.x.min = min;
-                    chart.options.scales.x.max = max;
-                } else {
-                    chart.options.scales.x.min = alignedMin;
-                    chart.options.scales.x.max = alignedMax;
-                }
+                chart.options.scales.x.min = viewMin;
+                chart.options.scales.x.max = viewMax;
 
                 if (chart.options.scales.x.ticks) {
                      chart.options.scales.x.ticks.stepSize = stepSize;
@@ -209,7 +217,7 @@
                                     hour12: false
                                 }).format(date);
                             },
-                            stepSize: 3600 // Default, will be overridden in updateChart if data exists
+                            // stepSize set in updateChart
                         },
                         grid: {
                             // Ensure grid lines are drawn
