@@ -156,9 +156,9 @@
         <div class="flex flex-row items-center space-x-2">
             <img src="https://catenarymaps.org/logomark.svg" alt="Catenary Maps" class="h-6">
             <div class="">|</div>
-            <img src="/Lametro.svg" class="h-7"/>
+            
             <h1 class="text-xl font-bold">
-                Bus Ping
+                LA Metro Bus Ping
             </h1>
         </div>
         
